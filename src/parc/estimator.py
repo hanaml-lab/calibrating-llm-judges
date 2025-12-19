@@ -78,3 +78,34 @@ def estimate(f, w, run, labelled, y, pi, *, alpha: float = 0.05, lam="tune", var
         raise ValueError(f"unknown variance {variance!r}")
     hw = crit * se
     return Estimate(value, hw, value - hw, value + hw, se, lam_v, G)
+
+
+def paired_estimate(a, b, p, rng, *, alpha: float = 0.05, lam="tune", one_sided: bool = False) -> Estimate:
+    """Difference in mean partial credit, version B minus version A, from paired runs audited together.
+
+    a and b are tuples (f, w, run, y, plan) with run indices aligned across versions (run i of A and run i of B share
+    a task and seed). One draw per pair decides whether both runs are audited; criteria are drawn separately in each.
+    With one_sided=True the returned bounds are one-sided at level 1 - alpha each (for a three-way release gate).
+    """
+    from .design import draw_criteria  # local import: the estimator itself needs no design state
+
+    n = len(p)
+    xi = rng.random(n) < p
+    parts = []
+    for f, w, run, y, plan in (a, b):
+        run = np.asarray(run, int)
+        sel, q = draw_criteria(plan, run, rng)
+        lab = xi[run] & sel
+        pi = p[run] * q
+        A, D, L, _ = _components(np.asarray(f, float), np.asarray(w, float), run, lab, np.asarray(y, float), pi, n)
+        parts.append((A, D, np.bincount(run, weights=L, minlength=n)))
+    A = parts[1][0] - parts[0][0]
+    D = parts[1][1] - parts[0][1]
+    lam_v = tune_lambda(A, D) if lam == "tune" else float(lam)
+    T = A + lam_v * D
+    G = int(((parts[0][2] + parts[1][2]) > 0).sum())
+    value = float(T.mean())
+    se = float(T.std(ddof=1) / np.sqrt(n))
+    level = 1 - alpha if one_sided else 1 - alpha / 2
+    hw = float(student_t.ppf(level, max(G - 1, 1))) * se
+    return Estimate(value, hw, value - hw, value + hw, se, lam_v, G)

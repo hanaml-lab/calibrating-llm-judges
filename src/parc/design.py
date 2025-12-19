@@ -44,6 +44,8 @@ class Plan:
     r_hi: np.ndarray    # per run: probability of drawing floor(m_i) + 1
     m: np.ndarray       # per run: expected number of criteria checked when audited
     cost: np.ndarray    # per run: expected minutes when audited
+    v: np.ndarray       # per run: predicted conditional variance of T_i (up to the factor 1/p_i)
+    eta: float = 0.2
 
 
 def _within(run, n, a, m, q_min):
@@ -96,26 +98,35 @@ def plan_audit(f, w, run, budget: float, c0: float, c1: float, rho: float, *, et
     q_hi = _within(run, n, a, np.minimum(K, m_lo + 1), q_min)
     cost = c0 + c1 * m_run
     uniform = np.minimum(1, np.full(n, budget / cost.sum()))
+    q_bar = q_lo * (1 - r_hi[run]) + q_hi * r_hi[run]
+    u = w * np.sqrt(np.clip(f * (1 - f), 1e-4, None))
+    s2 = np.bincount(run, weights=u * u, minlength=n)
+    EU2 = s2 + rho * (np.bincount(run, weights=u, minlength=n) ** 2 - s2)
+    within = np.maximum(np.bincount(run, weights=u * u / q_bar, minlength=n) - EU2 / m_run, 0)
+    within *= (K - m_run) / np.maximum(K - 1, 1)
+    V = within + EU2
     if not active:
         p = uniform
     else:
-        q_bar = q_lo * (1 - r_hi[run]) + q_hi * r_hi[run]
-        u = w * sig
-        s2 = np.bincount(run, weights=u * u, minlength=n)
-        EU2 = s2 + rho * (np.bincount(run, weights=u, minlength=n) ** 2 - s2)
-        within = np.maximum(np.bincount(run, weights=u * u / q_bar, minlength=n) - EU2 / m_run, 0)
-        within *= (K - m_run) / np.maximum(K - 1, 1)
-        V = within + EU2
         p = (1 - eta) * _scale_to_budget(np.sqrt(np.maximum(V, 1e-12) / cost), cost, budget) + eta * uniform
-    return Plan(p=p, q_lo=q_lo, q_hi=q_hi, r_hi=r_hi, m=m_run, cost=cost)
+    return Plan(p=p, q_lo=q_lo, q_hi=q_hi, r_hi=r_hi, m=m_run, cost=cost, v=V, eta=eta)
 
 
-def draw_audit(plan: Plan, run, rng: np.random.Generator):
-    """Draw which runs are audited and which criteria are checked in each; returns (labelled, pi) per cell, where pi
-    is the inclusion probability conditional on the number of criteria drawn in the run."""
+def plan_paired(plan_a: Plan, plan_b: Plan, budget: float) -> np.ndarray:
+    """Audit probability per pair of runs (same task and seed under versions A and B), audited together:
+    p proportional to sqrt((V_A + V_B) / (C_A + C_B)), mixed with the uniform design, spending `budget`."""
+    cost = plan_a.cost + plan_b.cost
+    score = np.sqrt(np.maximum(plan_a.v + plan_b.v, 1e-12) / cost)
+    uniform = np.minimum(1, np.full(len(cost), budget / cost.sum()))
+    eta = plan_a.eta
+    return (1 - eta) * _scale_to_budget(score, cost, budget) + eta * uniform
+
+
+def draw_criteria(plan: Plan, run, rng: np.random.Generator):
+    """Which criteria would be checked in each run if it were audited, and their inclusion probabilities
+    conditional on the number drawn (systematic sampling in a random order)."""
     run = np.asarray(run, int)
     n = len(plan.p)
-    xi = rng.random(n) < plan.p
     hi = rng.random(n) < plan.r_hi
     q = np.where(hi[run], plan.q_hi, plan.q_lo)
     order = np.lexsort((rng.random(len(q)), run))
@@ -129,4 +140,15 @@ def draw_audit(plan: Plan, run, rng: np.random.Generator):
     chosen = (np.ceil(upper - U - 1e-9) - np.ceil(lower - U - 1e-9)) >= 1
     sel = np.empty(len(q), bool)
     sel[order] = chosen
-    return xi[run] & sel, plan.p[run] * q
+    return sel, q
+
+
+def draw_audit(plan: Plan, run, rng: np.random.Generator, p=None):
+    """Draw which runs are audited and which criteria are checked in each; returns (labelled, pi) per cell, where pi
+    is the inclusion probability conditional on the number of criteria drawn in the run. `p` overrides plan.p (as
+    for paired audits)."""
+    run = np.asarray(run, int)
+    p = plan.p if p is None else np.asarray(p, float)
+    xi = rng.random(len(p)) < p
+    sel, q = draw_criteria(plan, run, rng)
+    return xi[run] & sel, p[run] * q
