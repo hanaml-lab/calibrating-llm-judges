@@ -1,0 +1,11 @@
+# TheAgentCompany: 175 tasks, checkpoints split into atomic criteria weighted by their points
+suite = "tac"
+tasks = 175
+seeds_per_agent = 2
+agents = ["OpenHands + Qwen3-Coder-480B-A35B-Instruct", "OpenHands + gpt-oss-120b"]
+c0 = 5.4
+c1 = 1.3
+calibration_runs = 160
+judge = "Qwen3-32B"
+criterion_types = ["state", "artifact", "comms", "process"]
+evidence_top_k = 8
