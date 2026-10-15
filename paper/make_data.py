@@ -600,7 +600,7 @@ def spearman(a, b):
 
 
 def judge_quality(B):
-    R, C, S = B["R"], B["C"], B["S"]
+    R, C = B["R"], B["C"]
     runsum = lambda x: np.bincount(C["run"], weights=x, minlength=len(R["S"]))
     tok_hol = (R["steps"] * 1.5 + 1.2).mean()
     out = {"hol": dict(mae=float(np.abs(B["hol"] - R["S"]).mean()), spearman=spearman(B["hol"], R["S"]),

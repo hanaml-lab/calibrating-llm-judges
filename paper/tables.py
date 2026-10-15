@@ -201,7 +201,6 @@ def main(R):
 
     # ---------------- drift
     D = R["drift"]
-    th0 = D["in_dist"]["theta"]
     body = "\\begin{tabular}{lccccccc}\n\\toprule\n& & \\multicolumn{2}{c}{Judge only} & \\multicolumn{2}{c}{\\parc{}, stale maps} & Refit & \\\\\n"
     body += "\\cmidrule(lr){3-4}\\cmidrule(lr){5-6}\n"
     body += "Change & ECE & Bias & Cov. & Cov. & $\\pm$ & $\\pm$ & Alarm \\\\\n\\midrule\n"

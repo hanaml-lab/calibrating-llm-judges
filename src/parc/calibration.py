@@ -18,7 +18,9 @@ def _pav(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         while len(vals) > 1 and vals[-2] > vals[-1]:
             w = wts[-2] + wts[-1]
             v = (vals[-2] * wts[-2] + vals[-1] * wts[-1]) / w
-            vals.pop(); wts.pop(); e = ends.pop()
+            vals.pop()
+            wts.pop()
+            e = ends.pop()
             vals[-1], wts[-1], ends[-1] = v, w, e
     return np.asarray(ends), np.asarray(vals)
 
