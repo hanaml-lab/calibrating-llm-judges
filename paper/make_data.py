@@ -951,6 +951,63 @@ def timing():
 
 
 # --------------------------------------------------------------------------------------------------------------
+# E9: few audited runs. The budget is set, trial by trial, so that PARC's design audits G runs in expectation
+# (sum of p_i = G); the same audit is analysed with the t reference on G - 1 degrees of freedom and with the normal
+# reference. Streams [MASTER, 1300 + suite, G, seed]: no number of E1-E8 moves.
+# --------------------------------------------------------------------------------------------------------------
+SMALL_G = [5, 10, 20, 40]
+
+
+def budget_for(tr, G):
+    """Annotator-minutes at which PARC's design audits G runs in expectation."""
+    lo, hi = 1.0, 64.0 * 60
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        p, _ = design_p(tr, "parc", mid)
+        lo, hi = (mid, hi) if p.sum() < G else (lo, mid)
+    return (lo + hi) / 2
+
+
+def job_small(args):
+    key, G, seed = args
+    B = build(key)
+    rng = jrng(1300 + SUITE_KEYS.index(key), G, seed)
+    rows = []
+    for tr in trials(B, rng, TRIALS):
+        budget = budget_for(tr, G)
+        p, Q = design_p(tr, "parc", budget)
+        L, pi = draw(tr, rng, p, Q)
+        T, _ = rectify(tr, tr.f["cal"], L, pi, "tune")
+        g = int((tr.runsum(L) > 0).sum())
+        rows.append((float(T.mean()), float(T.std(ddof=1) / math.sqrt(tr.N)), g, budget))
+    a = np.array(rows)
+    err = np.abs(a[:, 0] - B["theta"])
+    crit_t = tdist.ppf(0.975, np.maximum(a[:, 2] - 1, 1))
+    return (key, G, seed), dict(cov_t=float((err <= crit_t * a[:, 1]).mean()), cov_z=float((err <= Z * a[:, 1]).mean()),
+                                G=float(a[:, 2].mean()), hw_t=float((crit_t * a[:, 1]).mean()), hours=float(a[:, 3].mean() / 60))
+
+
+# --------------------------------------------------------------------------------------------------------------
+# E10: paired comparison at the main budget. Every estimator of a sweep trial sees the same judged runs, so the
+# 8-hour sweep is re-run trial by trial (the same streams, so the same numbers) and PARC's half-width is compared
+# with the strongest baseline's, active inference on whole runs, within each trial.
+# --------------------------------------------------------------------------------------------------------------
+PAIRED = ("parc", "active_run")
+
+
+def job_pairs(args):
+    key, seed = args
+    B = build(key)
+    rng = jrng(100 + SUITE_KEYS.index(key), MAIN_B, seed)
+    rows = {m: [] for m in SWEEP_METHODS}
+    for tr in trials(B, rng, TRIALS):
+        for m in SWEEP_METHODS:
+            rows[m].append(run_method(m, tr, rng, MAIN_B * 60)[:3])
+    return (key, seed), {m: rows[m] for m in PAIRED}, {m: summarise(rows[m], B["theta"]) for m in PAIRED}
+
+
+
+# --------------------------------------------------------------------------------------------------------------
 # Driver
 # --------------------------------------------------------------------------------------------------------------
 SWEEP_METHODS = METHODS + ["parc_iid"]
@@ -973,11 +1030,15 @@ def compute(procs=12):
     rel_jobs = [(j, s) for j in range(N_PAIRS) for s in range(3)]
     drift_jobs = [(sc, s) for sc in DRIFT for s in SEEDS]
     scale_jobs = [(j, s) for j in range(len(SCALE)) for s in SEEDS]
+    small_jobs = [(k, G, s) for k in SUITE_KEYS for G in SMALL_G for s in SEEDS]
+    pair_jobs = [(k, s) for k in SUITE_KEYS for s in SEEDS]
     with Pool(procs) as pool:
         sweep = pool.map(job_sweep, jobs, chunksize=1)
         rel = pool.map(job_release, rel_jobs, chunksize=1)
         dr = pool.map(job_drift, drift_jobs, chunksize=1)
         sc = pool.map(job_scale, scale_jobs, chunksize=1)
+        sm = pool.map(job_small, small_jobs, chunksize=1)
+        pr = pool.map(job_pairs, pair_jobs, chunksize=1)
     # suites, judges, probes
     res["suites"] = {}
     for k in SUITE_KEYS:
@@ -1035,6 +1096,31 @@ def compute(procs=12):
                                  acc=J["acc"], rho=J["rho"], gpu_h=J["gpu_h"],
                                  **{st: float(np.mean([x[st] for x in ss[j]])) for st in ss[j][0]}))
     res["timing"] = timing()
+    # few audited runs (E9)
+    res["meta"]["small_g"] = SMALL_G
+    res["small"] = {k: {} for k in SUITE_KEYS}
+    tmp = {}
+    for (k, G, s), r in sm:
+        tmp.setdefault((k, G), []).append(r)
+    for (k, G), rs in tmp.items():
+        res["small"][k][str(G)] = {st: dict(mean=float(np.mean([x[st] for x in rs])), seeds=[float(x[st]) for x in rs]) for st in rs[0]}
+    # paired comparison at the main budget (E10), after checking that the re-run reproduces the sweep exactly
+    from scipy.stats import wilcoxon
+    per = {k: {m: [] for m in PAIRED} for k in SUITE_KEYS}
+    for (k, s), rows, summ in pr:
+        for m in PAIRED:
+            for st, v in summ[m].items():
+                assert v == res["sweep"][k][str(MAIN_B)][m][st]["seeds"][SEEDS.index(s)], (k, s, m, st)
+            per[k][m].extend(rows[m])
+    res["paired"] = {"methods": list(PAIRED)}
+    for i, k in enumerate(SUITE_KEYS):
+        a, b = np.array(per[k]["parc"]), np.array(per[k]["active_run"])
+        d = a[:, 1] - b[:, 1]
+        boot = np.random.default_rng([MASTER, 1400, i]).integers(0, len(d), (2000, len(d)))
+        bm = d[boot].mean(axis=1)
+        res["paired"][k] = dict(n=int(len(d)), narrower=float((d < 0).mean()), ratio=float(a[:, 1].mean() / b[:, 1].mean()),
+                                diff=float(d.mean()), diff_ci=[float(np.quantile(bm, 0.025)), float(np.quantile(bm, 0.975))],
+                                wilcoxon_p=float(wilcoxon(a[:, 1], b[:, 1]).pvalue))
     return res
 
 

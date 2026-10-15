@@ -1,5 +1,7 @@
-"""All figures, drawn from data/results.json (written by make_data.py) at the printed size of the ACL format:
-one column is 3.03 in (7.7 cm) wide and a full-width figure* is 6.3 in (16 cm)."""
+"""All figures, drawn from data/results.json (written by make_data.py) at the size they are printed in the arXiv
+preprint style: the text block is 6.5 in wide, so a multi-panel figure is FULL = 6.5 in and a single panel WIDE = 4.5 in.
+Labels are 8 pt and ticks and legends 7 pt, as they print. Each PDF is exactly its figsize (constrained layout, no
+bbox cropping), so the site measures the printed width."""
 import json
 import os
 
@@ -13,12 +15,12 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 R = json.load(open(os.path.join(ROOT, "data", "results.json")))
 OUT = os.path.join(ROOT, "figures")
 os.makedirs(OUT, exist_ok=True)
-COL, FULL = 3.03, 6.3
+WIDE, FULL = 4.5, 6.5
 plt.rcParams.update({
-    "font.family": "serif", "font.serif": ["Times New Roman", "Times", "Nimbus Roman", "DejaVu Serif"], "mathtext.fontset": "stix",
-    "font.size": 7.5, "axes.labelsize": 7.5, "axes.titlesize": 8, "legend.fontsize": 6.5, "xtick.labelsize": 6.8, "ytick.labelsize": 6.8,
+    "font.family": "serif", "font.serif": ["Nimbus Roman", "Times New Roman", "Times", "DejaVu Serif"], "mathtext.fontset": "stix",
+    "font.size": 8, "axes.labelsize": 8, "axes.titlesize": 8, "legend.fontsize": 7, "xtick.labelsize": 7, "ytick.labelsize": 7,
     "axes.linewidth": 0.6, "axes.spines.top": False, "axes.spines.right": False, "grid.linewidth": 0.4, "grid.alpha": 0.35,
-    "axes.grid": True, "lines.linewidth": 1.1, "legend.frameon": False, "savefig.bbox": "tight", "savefig.pad_inches": 0.015,
+    "axes.grid": True, "lines.linewidth": 1.1, "legend.frameon": False, "figure.constrained_layout.use": True,
     "xtick.major.width": 0.5, "ytick.major.width": 0.5, "xtick.major.size": 2.5, "ytick.major.size": 2.5,
 })
 # Okabe-Ito
@@ -40,7 +42,7 @@ def band(seeds):
 
 
 # 1. Half-width against annotator-hours (headline figure; also the teaser)
-fig, axs = plt.subplots(1, 3, figsize=(FULL, 1.95), sharey=False)
+fig, axs = plt.subplots(1, 3, figsize=(FULL, 2.45), sharey=False)
 for ax, k in zip(axs, SUITES):
     for m in ["human_run", "ppi_run_hol", "ppi_run_crit", "active_run", "ppi_cell", "parc"]:
         mu = np.array([band(R["sweep"][k][str(b)][m]["hw"]["seeds"])[0] for b in BUD])
@@ -51,7 +53,7 @@ for ax, k in zip(axs, SUITES):
     s = R["suites"][k]
     floor = 1.96 * s["sd_S"] / np.sqrt(R["meta"]["n_judged"]) * PCT
     ax.axhline(floor, ls=":", color="#555555", lw=0.7)
-    ax.text(2.1, floor * 1.08, "run-sampling floor", fontsize=5.8, color="#555555")
+    ax.text(2.1, floor * 1.08, "run-sampling floor", fontsize=7, color="#555555")
     ax.set_xscale("log", base=2); ax.set_yscale("log")
     ax.set_xticks(BUD); ax.set_xticklabels([str(b) for b in BUD])
     ax.set_yticks([1, 2, 5, 10, 20]); ax.set_yticklabels(["1", "2", "5", "10", "20"])
@@ -60,27 +62,26 @@ for ax, k in zip(axs, SUITES):
     ax.set_title(TITLE[k])
 axs[0].set_ylabel("95% CI half-width (points)")
 h, l = axs[0].get_legend_handles_labels()
-fig.legend(h, l, loc="upper center", ncol=6, bbox_to_anchor=(0.5, 1.09), handlelength=1.6, columnspacing=1.0)
-fig.subplots_adjust(wspace=0.28)
+fig.legend(h, l, loc="outside upper center", ncol=6, handlelength=1.6, columnspacing=1.0)
 fig.savefig(os.path.join(OUT, "fig_budget.pdf"))
 plt.close(fig)
 
 # 2. Coverage against budget, averaged over suites
-fig, ax = plt.subplots(figsize=(COL, 1.85))
+fig, ax = plt.subplots(figsize=(WIDE, 2.6))
 for m in ["parc", "parc_iid", "ppi_run_crit", "human_run", "judge_cal"]:
     cov = np.array([[R["sweep"][k][str(b)][m]["cov"]["mean"] for b in BUD] for k in SUITES]) * PCT
     ax.plot(BUD, cov.mean(0), marker="o", ms=2.3, color=C[m] if m != "judge_cal" else "#777777", lw=1.5 if m == "parc" else 0.95,
             label=LAB[m], ls="--" if m == "judge_cal" else "-")
 ax.axhline(95, ls=":", color="#000000", lw=0.7)
-ax.text(2.05, 95.6, "nominal 95%", fontsize=5.8)
+ax.text(2.05, 97.0, "nominal 95%", fontsize=7)
 ax.set_xscale("log", base=2); ax.set_xticks(BUD); ax.set_xticklabels([str(b) for b in BUD])
 ax.set_ylim(20, 100); ax.set_xlabel("Annotator-hours per evaluation"); ax.set_ylabel("Coverage (%)")
-ax.legend(loc="center right", bbox_to_anchor=(1.0, 0.42), ncol=1, fontsize=5.8)
+ax.legend(loc="center right", bbox_to_anchor=(1.0, 0.42), ncol=1)
 fig.savefig(os.path.join(OUT, "fig_coverage.pdf"))
 plt.close(fig)
 
 # 3. Reliability diagrams (BackOffice)
-fig, ax = plt.subplots(figsize=(COL, 2.2))
+fig, ax = plt.subplots(figsize=(WIDE, 3.0))
 ax.plot([0, 1], [0, 1], "--", color="#555555", lw=0.7)
 for key, col, lab in [("ric_raw", "#E69F00", "Rubric in context, raw"), ("crit_raw", "#CC79A7", "Criterion + retrieval, raw"),
                       ("crit_cal", "#0072B2", "Criterion + retrieval, calibrated")]:
@@ -89,12 +90,12 @@ for key, col, lab in [("ric_raw", "#E69F00", "Rubric in context, raw"), ("crit_r
     ax.plot([p for p, _ in pts], [a for _, a in pts], "-o", ms=2.3, color=col, label=f"{lab} (ECE {e:.3f})")
 ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.set_aspect("equal")
 ax.set_xlabel("Judge probability that the criterion is met"); ax.set_ylabel("Fraction met (human)")
-ax.legend(loc="upper left", fontsize=5.8)
+ax.legend(loc="upper left")
 fig.savefig(os.path.join(OUT, "fig_reliability.pdf"))
 plt.close(fig)
 
 # 4. Accuracy against the position of the decisive evidence (all suites)
-fig, ax = plt.subplots(figsize=(COL, 1.75))
+fig, ax = plt.subplots(figsize=(WIDE, 2.5))
 x = (np.arange(10) + 0.5) / 10
 for pr, col, lab in [("ric", "#E69F00", "Rubric in context"), ("crit", "#0072B2", "Criterion + retrieval")]:
     acc = np.array([[R["probes"][k][pr]["pos"][d] for d in range(10)] for k in SUITES])
@@ -109,7 +110,7 @@ fig.savefig(os.path.join(OUT, "fig_position.pdf"))
 plt.close(fig)
 
 # 5. Criteria per audited run: empirical half-width of the uniform design against the Proposition 2 prediction
-fig, ax = plt.subplots(figsize=(COL, 2.05))
+fig, ax = plt.subplots(figsize=(WIDE, 3.0))
 cols = {"tac": "#E69F00", "devai": "#009E73", "bo": "#0072B2"}
 for k in SUITES:
     s_ = R["suites"][k]
@@ -133,12 +134,12 @@ ax.plot([], [], "-", color="#555555", lw=0.8, label="Prop. 2 prediction")
 ax.set_xscale("log", base=2); ax.set_xticks([1, 2, 4, 8, 16]); ax.set_xticklabels(["1", "2", "4", "8", "16"])
 ax.set_xlabel("Criteria checked per audited run, $m$"); ax.set_ylabel("Half-width / best uniform")
 ax.set_ylim(0.8, 1.3)
-ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), fontsize=5.6, ncol=3, columnspacing=0.8, handletextpad=0.3)
+fig.legend(*ax.get_legend_handles_labels(), loc="outside upper center", ncol=3, columnspacing=0.8, handletextpad=0.3)
 fig.savefig(os.path.join(OUT, "fig_mstar.pdf"))
 plt.close(fig)
 
 # 6. Release gating: estimated against true change, BackOffice version pairs
-fig, axs = plt.subplots(1, 2, figsize=(COL, 1.75), sharey=True)
+fig, axs = plt.subplots(1, 2, figsize=(FULL, 2.9), sharey=True)
 rel = sorted(R["release"], key=lambda r: r["dtrue"])
 dt = np.array([r["dtrue"] for r in rel]) * PCT
 for ax, m, ttl in [(axs[0], "judge_hol", "Holistic judge only"), (axs[1], "parc", "PARC, 32 h, 90% interval")]:
@@ -153,18 +154,18 @@ for ax, m, ttl in [(axs[0], "judge_hol", "Holistic judge only"), (axs[1], "parc"
         hi = np.array([r["m"][m + "@32"]["hi"] for r in rel]) * PCT
         ax.vlines(dt, lo, hi, color="#0072B2", lw=0.6, alpha=0.7)
     ax.set_xlim(lim); ax.set_ylim(lim)
-    ax.set_title(ttl, fontsize=7)
+    ax.set_title(ttl)
     ax.set_xlabel("True change (points)")
 axs[0].set_ylabel("Estimated change (points)")
 cb = fig.colorbar(sc, ax=axs, fraction=0.05, pad=0.02)
-cb.set_label("Claim shift (logit)", fontsize=6); cb.ax.tick_params(labelsize=5.5)
+cb.set_label("Claim shift (logit)", fontsize=7); cb.ax.tick_params(labelsize=7)
 fig.savefig(os.path.join(OUT, "fig_release.pdf"))
 plt.close(fig)
 
 # 7. Weekly evaluations through a judge update (week 6) and an agent update (week 9)
 W = R["weekly"]
 wk = np.array([w["week"] for w in W])
-fig, ax = plt.subplots(figsize=(COL, 1.85))
+fig, ax = plt.subplots(figsize=(WIDE, 2.75))
 ax.plot(wk, [w["theta"] * PCT for w in W], "-", color="#000000", lw=1.0, label="Truth (all runs graded)")
 ax.plot(wk, [w["judge"] * PCT for w in W], "--s", ms=2.2, color="#E69F00", lw=0.9, label="Judge only, maps of week 0")
 ax.errorbar(wk, [w["parc"] * PCT for w in W], yerr=[w["hw"] * PCT for w in W], fmt="o", ms=2.6, color="#0072B2", capsize=1.5,
@@ -173,15 +174,15 @@ al = [w["week"] for w in W if w["alarm"]]
 ax.plot(al, [72.5] * len(al), "v", ms=4, color="#D55E00", label="Drift alarm; maps refit", ls="none")
 ax.axvspan(5.5, 12.5, color="#999999", alpha=0.08, lw=0)
 ax.axvspan(8.5, 12.5, color="#999999", alpha=0.10, lw=0)
-ax.text(5.6, 31.5, "judge update", fontsize=5.8); ax.text(8.6, 34.5, "agent update", fontsize=5.8)
+ax.text(5.6, 31.5, "judge update", fontsize=7); ax.text(8.6, 34.5, "agent update", fontsize=7)
 ax.set_xticks(range(1, 13)); ax.set_xlim(0.5, 12.5); ax.set_ylim(30, 75)
 ax.set_xlabel("Week"); ax.set_ylabel("Mean partial credit (points)")
-ax.legend(loc="upper left", fontsize=5.6, ncol=1)
+ax.legend(loc="upper left", ncol=1)
 fig.savefig(os.path.join(OUT, "fig_weekly.pdf"))
 plt.close(fig)
 
 # 8. Judge scaling: label savings against judge discrimination
-fig, ax = plt.subplots(figsize=(COL, 1.85))
+fig, ax = plt.subplots(figsize=(WIDE, 2.75))
 S = R["scale"]
 bs = np.array(BUD, float)
 hh = np.array([R["sweep"]["bo"][str(b)]["human_run"]["hw"]["mean"] for b in BUD])
@@ -202,10 +203,29 @@ y = np.array([eq(s["hw"]) / R["meta"]["main_b"] for s in S])
 fam = [s["family"] for s in S]
 for xi, yi, s, f in zip(x, y, S, fam):
     ax.plot(xi, yi, "o", ms=3.2, color={"qwen": "#0072B2", "llama": "#009E73", "oss": "#D55E00"}[f])
-    off = {"Llama-3.3-70B": (-46, 3), "Qwen3-14B": (4, -6), "Qwen3-235B-A22B": (-62, -2), "gpt-oss-120b": (-48, 1)}.get(s["name"], (4, 1))
-    ax.annotate(s["name"], (xi, yi), xytext=off, textcoords="offset points", fontsize=5.6)
+    off = {"Llama-3.3-70B": (-56, 3), "Qwen3-14B": (4, -7), "Qwen3-235B-A22B": (-76, -2), "gpt-oss-120b": (-58, 1)}.get(s["name"], (4, 1))
+    ax.annotate(s["name"], (xi, yi), xytext=off, textcoords="offset points", fontsize=7)
 ax.set_xlabel("Judge AUROC on criterion verdicts"); ax.set_ylabel("Savings vs. full-run grading ($\\times$)")
 ax.set_xlim(0.84, 1.0)
 fig.savefig(os.path.join(OUT, "fig_scale.pdf"))
 plt.close(fig)
+# 9. Few audited runs: coverage with the t reference and with the normal reference (E9)
+if "small" in R:
+    G = R["meta"]["small_g"]
+    fig, ax = plt.subplots(figsize=(WIDE, 2.6))
+    cols = {"tac": "#E69F00", "devai": "#009E73", "bo": "#0072B2"}
+    for k in SUITES:
+        g = [R["small"][k][str(x)]["G"]["mean"] for x in G]
+        ax.plot(g, [R["small"][k][str(x)]["cov_t"]["mean"] * PCT for x in G], "-o", ms=3, color=cols[k], label=f"{TITLE[k]}, $t_{{G-1}}$")
+        ax.plot(g, [R["small"][k][str(x)]["cov_z"]["mean"] * PCT for x in G], "--s", ms=2.6, color=cols[k], mfc="white", label=f"{TITLE[k]}, normal")
+    n = len(R["meta"]["seeds"]) * R["meta"]["trials_per_seed"]
+    se = 1.96 * np.sqrt(0.95 * 0.05 / n) * PCT
+    ax.axhspan(95 - se, 95 + se, color="#000000", alpha=0.06, lw=0)
+    ax.axhline(95, ls=":", color="#000000", lw=0.7)
+    ax.set_xscale("log", base=2); ax.set_xticks(G); ax.set_xticklabels([str(x) for x in G]); ax.minorticks_off()
+    ax.set_xlabel("Audited runs per evaluation, $G$ (mean)"); ax.set_ylabel("Coverage (%)")
+    ax.set_ylim(78, 99)
+    ax.legend(loc="lower right", ncol=2, columnspacing=0.8)
+    fig.savefig(os.path.join(OUT, "fig_smallg.pdf"))
+    plt.close(fig)
 print("figures written")

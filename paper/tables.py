@@ -245,6 +245,54 @@ def main(R):
     N["timing"] = Ti
     N["suites"] = SU
 
+    # ---------------- statistical reporting (appendix): Wilson intervals for coverage over the 1,000 trials of a cell,
+    # t intervals over the five seeds for half-widths and the human-time factor, and the trial-paired comparison of
+    # PARC with the strongest baseline (make_data.py, E10)
+    from scipy.stats import t as tdist
+    n_tr = len(R["meta"]["seeds"]) * R["meta"]["trials_per_seed"]
+    z = 1.959963984540054
+
+    def wilson(p):
+        c = (p + z * z / (2 * n_tr)) / (1 + z * z / n_tr)
+        h = z * math.sqrt(p * (1 - p) / n_tr + z * z / (4 * n_tr * n_tr)) / (1 + z * z / n_tr)
+        return [c - h, c + h]
+
+    def tci(seeds):
+        a = np.array(seeds)
+        h = tdist.ppf(0.975, len(a) - 1) * a.std(ddof=1) / math.sqrt(len(a))
+        return [float(a.mean() - h), float(a.mean() + h)]
+
+    S_ = {"cov_parc": {k: wilson(R["sweep"][k][mb]["parc"]["cov"]["mean"]) for k in SUITES},
+          "cov_iid": {k: wilson(R["abl"][k]["parc_iid"]["cov"]["mean"]) for k in SUITES},
+          "hw_parc": {k: tci(R["sweep"][k][mb]["parc"]["hw"]["seeds"]) for k in SUITES},
+          "hw_active": {k: tci(R["sweep"][k][mb]["active_run"]["hw"]["seeds"]) for k in SUITES}}
+    nseed = len(R["meta"]["seeds"])
+    fac = [float(np.mean([equiv_hours(R, k, R["sweep"][k][mb]["parc"]["hw"]["seeds"][i]) / R["meta"]["main_b"] for k in SUITES]))
+           for i in range(nseed)]
+    S_["factor"] = dict(seeds=fac, ci=tci(fac))
+    S_["paired"] = R["paired"]
+    N["stats"] = S_
+    pv = lambda p: "$<10^{-6}$" if p < 1e-6 else f"{p:.1g}"
+    rng2 = lambda c, d=1: f"[{pts(c[0], d)}, {pts(c[1], d)}]"
+    rows = [
+        ("\\parc{} coverage (\\%)", [f"{pts(R['sweep'][k][mb]['parc']['cov']['mean'])} {rng2(S_['cov_parc'][k])}" for k in SUITES]),
+        ("i.i.d.-cell variance, coverage (\\%)", [f"{pts(R['abl'][k]['parc_iid']['cov']['mean'])} {rng2(S_['cov_iid'][k])}" for k in SUITES]),
+        ("\\parc{} half-width (points)", [f"{pts(R['sweep'][k][mb]['parc']['hw']['mean'], 2)} {rng2(S_['hw_parc'][k], 2)}" for k in SUITES]),
+        ("Active inference half-width (points)", [f"{pts(R['sweep'][k][mb]['active_run']['hw']['mean'], 2)} {rng2(S_['hw_active'][k], 2)}" for k in SUITES]),
+        ("Paired difference (points)", [f"$-${pts(-R['paired'][k]['diff'], 2)} [$-${pts(-R['paired'][k]['diff_ci'][0], 2)}, $-${pts(-R['paired'][k]['diff_ci'][1], 2)}]" for k in SUITES]),
+        ("Trials in which \\parc{} is narrower (\\%)", [pts(R["paired"][k]["narrower"]) for k in SUITES]),
+        ("Wilcoxon signed-rank $p$", [pv(R["paired"][k]["wilcoxon_p"]) for k in SUITES]),
+    ]
+    body = "\\begin{tabular}{lccc}\n\\toprule\n & TheAgentCompany & DevAI & BackOffice \\\\\n\\midrule\n"
+    for label, cells in rows:
+        body += label + " & " + " & ".join(cells) + " \\\\\n"
+    body += "\\bottomrule\n\\end{tabular}\n"
+    write("stats.tex", body)
+
+    # ---------------- few audited runs (E9)
+    if "small" in R:
+        N["small"] = {k: {G: {st: R["small"][k][G][st]["mean"] for st in R["small"][k][G]} for G in R["small"][k]} for k in SUITES}
+
     json.dump(N, open(os.path.join(ROOT, "data", "numbers.json"), "w"), indent=1)
     print("tables written")
 

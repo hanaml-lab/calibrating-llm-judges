@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/hanaml-lab/calibrating-llm-judges/actions/workflows/ci.yml/badge.svg)](https://github.com/hanaml-lab/calibrating-llm-judges/actions/workflows/ci.yml)
 
-Reference implementation of *Judging Long Agent Runs with Valid Error Bars: Prediction-Powered Audits of Rubric Criteria* (Agarwal, hanaML technical report, 2026).
+Reference implementation of *Judging Long Agent Runs with Valid Error Bars: Prediction-Powered Audits of Rubric Criteria* (Agarwal, hanaML preprint, 2025).
 
 Long agent runs are graded against rubrics, usually by an LLM judge. PARC turns the judge's per-criterion verdicts and a few hours of human checking into an estimate of mean partial credit with a confidence interval that is asymptotically valid whatever the judge's quality:
 
@@ -115,12 +115,12 @@ tests/          pytest suite
 ## Citation
 
 ```bibtex
-@techreport{hanaml2026calibratingllmjudges,
+@techreport{hanaml2025calibratingllmjudges,
   title       = {Judging Long Agent Runs with Valid Error Bars: Prediction-Powered Audits of Rubric Criteria},
   author      = {Manav Agarwal},
   institution = {hanaML},
   type        = {Technical report},
-  year        = {2026},
+  year        = {2025},
   month       = jan,
   url         = {https://hanaml.com/research/papers/calibrating-llm-judges}
 }
