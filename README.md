@@ -99,7 +99,7 @@ These numbers come from the report's seeded simulation and are illustrative. Mea
 
 Treating PARC's audit as independent criteria covers at only 81–88%. Release gates built on PARC ship 2.1% of regressions at 8 hours, against 24–33% for judge-only gates.
 
-`bash scripts/reproduce_paper.sh` regenerates every table and figure. On every push, CI reruns `paper/make_data.py` and checks its tables and results against `paper/results.sha256` (`python paper/check_results.py`), so the report's numbers are exactly what the script emits.
+`bash scripts/reproduce_paper.sh` regenerates the tables and figures that the report's seeded simulation produces. On every push, CI reruns `paper/make_data.py` and checks the tables and results it writes against `paper/results.sha256` (`python paper/check_results.py`).
 
 ## Layout
 
