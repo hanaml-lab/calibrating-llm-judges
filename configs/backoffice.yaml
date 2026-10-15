@@ -1,0 +1,12 @@
+# BackOffice: 300 tasks in a resettable back-office environment, weighted criteria
+suite: "bo"
+tasks: 300
+seeds_per_agent: 2
+agents: ["Back Office Agents + Qwen3-235B-A22B", "Back Office Agents + gpt-oss-120b"]
+c0: 5.8
+c1: 1.4
+calibration_runs: 160
+judge: "Qwen3-32B"
+criterion_types: ["state", "artifact", "comms", "process"]
+evidence_top_k: 8
+release_margin_points: 2

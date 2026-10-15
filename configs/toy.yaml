@@ -1,0 +1,12 @@
+# CPU toy setting for python -m parc.demo (src/parc/toy.py): long runs with weighted rubrics, human labels and an
+# overconfident, lenient judge whose errors share a cause within a run.
+seed: 0
+trials: 200             # independent audits; coverage is the share whose interval contains the truth
+budget_minutes: 480     # expected annotator minutes per audit
+n_tasks: 300
+seeds: 2                # runs per task
+k_mean: 10.0            # criteria per run, on average
+c0: 5.8                 # minutes to understand a run before checking anything
+c1: 1.4                 # minutes per criterion checked with evidence pointers
+n_cal_runs: 160         # fully checked runs of an earlier agent version, for calibration
+n_judged: 2000          # judged runs per audit
